@@ -1,9 +1,6 @@
 package com.legalreview.ui
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -16,7 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 在真机/模拟器上跑：验证 MainApp 渲染、provider 切换、保存按钮等 UI 行为。
+ * 在真机/模拟器上跑：验证 MainApp 渲染、权限按钮、配置重建持久化等 UI 行为。
  * 不依赖网络或悬浮窗权限。
  */
 @RunWith(AndroidJUnit4::class)
@@ -36,16 +33,15 @@ class MainScreenTest {
     }
 
     @Test
-    fun savingSettings_persistsAcrossRecreate() {
-        // 改 API Key + 保存 → 杀进程重开 → 验证还在
-        val newKey = "sk-instrumentation-${System.currentTimeMillis()}"
-        composeRule.onNodeWithText("API Key").performClick()
-        composeRule.onNodeWithText("API Key").performTextInput(newKey)
-        composeRule.onNodeWithText("保存设置").performClick()
+    fun config_survivesRecreateWithoutSave() {
+        // M3: rememberSaveable 保证未保存的输入在 Activity 重建后不丢。
+        // 用 model 字段（非掩码）验证，API Key 已掩码不便断言明文。
+        val newModel = "test-model-${System.currentTimeMillis()}"
+        composeRule.onNodeWithText("模型名").performClick()
+        composeRule.onNodeWithText("模型名").performTextInput(newModel)
 
-        // 触发 Activity 重建（旋转模拟）
         composeRule.activityRule.scenario.recreate()
 
-        composeRule.onNodeWithText(newKey).assertIsDisplayed()
+        composeRule.onNodeWithText(newModel, substring = true).assertIsDisplayed()
     }
 }

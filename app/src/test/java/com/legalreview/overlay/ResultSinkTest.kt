@@ -1,7 +1,10 @@
 package com.legalreview.overlay
 
 import com.legalreview.analysis.AnalysisResult
+import com.legalreview.analysis.FindingSource
+import com.legalreview.analysis.RiskCategory
 import com.legalreview.analysis.RiskFinding
+import com.legalreview.analysis.Severity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,24 +21,20 @@ class ResultSinkTest {
         val original = AnalysisResult(
             findings = listOf(
                 RiskFinding(
-                    category = "AUTO_RENEW",
-                    categoryLabel = "自动续费",
-                    severity = "HIGH",
-                    severityLabel = "高",
+                    category = RiskCategory.AUTO_RENEW,
+                    severity = Severity.HIGH,
                     excerpt = "试用期结束后自动续费",
                     explanation = "可能产生持续扣款",
                     advice = "退订前留意",
-                    source = "local"
+                    source = FindingSource.LOCAL
                 ),
                 RiskFinding(
-                    category = "OTHER",
-                    categoryLabel = "其他",
-                    severity = "MEDIUM",
-                    severityLabel = "中",
+                    category = RiskCategory.OTHER,
+                    severity = Severity.MEDIUM,
                     excerpt = "模糊条款",
                     explanation = "e",
                     advice = "a",
-                    source = "llm"
+                    source = FindingSource.LLM
                 )
             ),
             rawTextLength = 1234,
@@ -50,12 +49,13 @@ class ResultSinkTest {
 
     @Test
     fun `decode tolerates unknown fields`() {
-        // ignoreUnknownKeys = true：将来 RiskFinding 加字段时，旧 JSON 仍能解码
+        // ignoreUnknownKeys = true：将来 RiskFinding 加字段时，旧 JSON 仍能解码。
+        // 注意：枚举值必须合法（category/severity/source），未知的是额外字段。
         val raw = """
             {
               "findings": [
-                {"category":"X","categoryLabel":"x","severity":"LOW","severityLabel":"低",
-                 "excerpt":"e","explanation":"e","advice":"a","source":"local",
+                {"category":"AUTO_RENEW","severity":"LOW",
+                 "excerpt":"e","explanation":"e","advice":"a","source":"LOCAL",
                  "futureField":"should be ignored","nested":{"a":1}}
               ],
               "rawTextLength": 42,
@@ -66,7 +66,7 @@ class ResultSinkTest {
 
         val decoded = ResultSink.decode(raw)
         assertEquals(1, decoded.findings.size)
-        assertEquals("X", decoded.findings[0].category)
+        assertEquals(RiskCategory.AUTO_RENEW, decoded.findings[0].category)
         assertEquals(42, decoded.rawTextLength)
         assertFalse(decoded.llmUsed)
     }

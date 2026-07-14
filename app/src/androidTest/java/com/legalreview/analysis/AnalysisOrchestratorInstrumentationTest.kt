@@ -33,20 +33,21 @@ class AnalysisOrchestratorInstrumentationTest {
 
         assertFalse(result.llmUsed)
         assertTrue(result.findings.isNotEmpty())
-        assertTrue(result.findings.all { it.source == "local" })
+        assertTrue(result.findings.all { it.source == FindingSource.LOCAL })
     }
 
     @Test
     fun withLlm_mergesFindings() = runBlocking {
+        // OTHER 本地规则不命中，确保该 finding 来自 LLM
         val llmJson = """
-            [{"category":"AUTO_RENEW","severity":"HIGH","excerpt":"自动续费","explanation":"e","advice":"a"}]
+            [{"category":"OTHER","severity":"HIGH","excerpt":"x","explanation":"e","advice":"a"}]
         """.trimIndent()
         val orchestrator = AnalysisOrchestrator(llmClient = FakeLlmClient(llmJson))
         val result = orchestrator.analyze(sampleAgreement)
 
         assertTrue(result.llmUsed)
-        assertTrue(result.findings.any { it.source == "llm" && it.category == "AUTO_RENEW" })
+        assertTrue(result.findings.any { it.source == FindingSource.LLM && it.category == RiskCategory.OTHER })
         // 本地规则仍应贡献 LIABILITY_LIMIT 等
-        assertTrue(result.findings.any { it.source == "local" && it.category == "LIABILITY_LIMIT" })
+        assertTrue(result.findings.any { it.source == FindingSource.LOCAL && it.category == RiskCategory.LIABILITY_LIMIT })
     }
 }

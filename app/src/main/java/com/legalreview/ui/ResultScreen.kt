@@ -20,7 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.legalreview.analysis.AnalysisResult
+import com.legalreview.analysis.FindingSource
 import com.legalreview.analysis.RiskFinding
+import com.legalreview.analysis.Severity
 
 @Composable
 fun ResultScreen(result: AnalysisResult, onClose: () -> Unit) {
@@ -35,15 +37,25 @@ fun ResultScreen(result: AnalysisResult, onClose: () -> Unit) {
             Text("协议风险审查结果", style = MaterialTheme.typography.headlineSmall)
             Text(
                 "共 ${result.findings.size} 条风险 · 文本长度 ${result.rawTextLength} · " +
-                        "云端分析：${if (result.llmUsed) "已用" else "未用/失败"}",
+                        "云端分析：${llmStatusText(result)}",
                 style = MaterialTheme.typography.bodySmall
             )
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                items(result.findings) { finding ->
-                    RiskCard(finding)
+            if (result.findings.isEmpty()) {
+                // L3: 空结果占位，避免大片空白
+                Text(
+                    "未发现明显风险条款",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray
+                )
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // L4: 稳定 key（merge 后每类别最多一条）
+                    items(result.findings, key = { it.category.name }) { finding ->
+                        RiskCard(finding)
+                    }
                 }
             }
             Button(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
@@ -51,6 +63,13 @@ fun ResultScreen(result: AnalysisResult, onClose: () -> Unit) {
             }
         }
     }
+}
+
+/** H2: 把 LLM 失败原因透传到 UI，区分"无风险"与"调用失败" */
+private fun llmStatusText(result: AnalysisResult): String = when {
+    result.llmError != null -> "失败（${result.llmError}）"
+    result.llmUsed -> "已用"
+    else -> "未用"
 }
 
 @Composable
@@ -61,14 +80,14 @@ private fun RiskCard(finding: RiskFinding) {
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text(finding.categoryLabel) })
+                AssistChip(onClick = {}, label = { Text(finding.category.label) })
                 Text(
-                    finding.severityLabel,
+                    finding.severity.label,
                     color = severityColor(finding.severity),
                     style = MaterialTheme.typography.labelLarge
                 )
                 Text(
-                    if (finding.source == "llm") "云端" else "本地",
+                    if (finding.source == FindingSource.LLM) "云端" else "本地",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray
                 )
@@ -84,8 +103,8 @@ private fun RiskCard(finding: RiskFinding) {
     }
 }
 
-private fun severityColor(severity: String): Color = when (severity.uppercase()) {
-    "HIGH" -> Color(0xFFD32F2F)
-    "MEDIUM" -> Color(0xFFF57C00)
-    else -> Color(0xFF6A6A6A)
+private fun severityColor(severity: Severity): Color = when (severity) {
+    Severity.HIGH -> Color(0xFFD32F2F)
+    Severity.MEDIUM -> Color(0xFFF57C00)
+    Severity.LOW -> Color(0xFF6A6A6A)
 }

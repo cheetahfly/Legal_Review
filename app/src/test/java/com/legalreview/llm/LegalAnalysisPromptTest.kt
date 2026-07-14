@@ -20,10 +20,10 @@ class LegalAnalysisPromptTest {
     }
 
     @Test
-    fun `system prompt demands json array output`() {
-        // 关键约束：只要 JSON、不要 markdown 标记、空则输出 []
+    fun `system prompt demands json object output`() {
+        // 关键约束：只要 JSON、不要 markdown 标记、空则输出 {"findings": []}
         assertTrue(LEGAL_ANALYSIS_SYSTEM_PROMPT.contains("JSON"))
-        assertTrue(LEGAL_ANALYSIS_SYSTEM_PROMPT.contains("空数组"))
+        assertTrue(LEGAL_ANALYSIS_SYSTEM_PROMPT.contains("findings"))
         assertTrue(LEGAL_ANALYSIS_SYSTEM_PROMPT.contains("markdown") || LEGAL_ANALYSIS_SYSTEM_PROMPT.contains("代码块"))
     }
 

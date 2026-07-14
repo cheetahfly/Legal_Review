@@ -5,14 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 
 /**
  * 透明的授权 Activity：发起 MediaProjection 系统授权框，拿到结果后启动/初始化前台服务中的截图器。
  * 由用户在主界面点击「授权截屏」触发。
  */
-class ProjectionAuthActivity : AppCompatActivity() {
+class ProjectionAuthActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +33,10 @@ class ProjectionAuthActivity : AppCompatActivity() {
             }
             finish()
         }
-        launcher.launch(captureManager.createScreenCaptureIntent())
+        // M14: 旋转等配置变更重建时不重复弹出授权框
+        if (savedInstanceState == null) {
+            launcher.launch(captureManager.createScreenCaptureIntent())
+        }
     }
 
     companion object {

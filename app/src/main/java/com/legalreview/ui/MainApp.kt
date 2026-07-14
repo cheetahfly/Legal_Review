@@ -24,10 +24,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.DefaultLifecycleObserver
 import com.legalreview.accessibility.LegalAccessibilityService
@@ -44,7 +46,12 @@ fun MainApp() {
     val context = LocalContext.current
     val settingsRepo = remember { SettingsRepository(context) }
 
-    var config by remember { mutableStateOf(settingsRepo.loadConfig()) }
+    // M3: 用 rememberSaveable 持久化配置字段，旋转/配置变更不丢失未保存的输入
+    val initial = remember { settingsRepo.loadConfig() }
+    var provider by rememberSaveable { mutableStateOf(initial.provider) }
+    var model by rememberSaveable { mutableStateOf(initial.model) }
+    var apiKey by rememberSaveable { mutableStateOf(initial.apiKey) }
+
     var overlayGranted by remember {
         mutableStateOf(LegalOverlayService.hasOverlayPermission(context))
     }
@@ -52,6 +59,11 @@ fun MainApp() {
         mutableStateOf(LegalAccessibilityService.isEnabled(context))
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
+
+    val saveCurrentConfig = {
+        val preset = LlmProviderPresets.byProvider(provider)
+        settingsRepo.saveConfig(preset.copy(apiKey = apiKey, model = model))
+    }
 
     // 从设置页返回时刷新权限状态
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,14 +121,16 @@ fun MainApp() {
         Text("云端模型", style = MaterialTheme.typography.titleMedium)
         Box {
             TextButton(onClick = { dropdownExpanded = true }) {
-                Text("${config.provider} · ${config.model}")
+                Text("$provider · $model")
             }
             DropdownMenu(expanded = dropdownExpanded, onDismissRequest = { dropdownExpanded = false }) {
                 LlmProviderPresets.ALL.forEach { preset ->
                     DropdownMenuItem(
                         text = { Text("${preset.provider} · ${preset.model}") },
                         onClick = {
-                            config = config.copy(provider = preset.provider, baseUrl = preset.baseUrl, model = preset.model)
+                            provider = preset.provider
+                            model = preset.model
+                            apiKey = "" // 切换 provider 清空旧 key
                             dropdownExpanded = false
                         }
                     )
@@ -124,30 +138,29 @@ fun MainApp() {
             }
         }
 
-        var apiKey by remember(config.provider) { mutableStateOf(config.apiKey) }
         OutlinedTextField(
-            value = config.model,
-            onValueChange = { config = config.copy(model = it) },
+            value = model,
+            onValueChange = { model = it },
             label = { Text("模型名") },
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
         OutlinedTextField(
             value = apiKey,
-            onValueChange = { apiKey = it; config = config.copy(apiKey = it) },
+            onValueChange = { apiKey = it },
             label = { Text("API Key") },
+            // M10: API Key 密码掩码，防肩窥/截图泄露
+            visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = {
-                settingsRepo.saveConfig(config)
-            }) { Text("保存设置") }
+            Button(onClick = { saveCurrentConfig() }) { Text("保存设置") }
             Button(
                 onClick = {
                     // 先保存配置，再走 MediaProjection 授权并启动悬浮按钮
-                    settingsRepo.saveConfig(config)
+                    saveCurrentConfig()
                     ProjectionAuthActivity.start(context)
                 },
                 enabled = overlayGranted
@@ -160,7 +173,9 @@ fun MainApp() {
                     "2. 填写云端模型 API Key 并保存\n" +
                     "3. 点击「授权并启动悬浮按钮」，允许屏幕共享\n" +
                     "4. 在其他 App/网页遇到协议弹窗时，点悬浮按钮即可审查\n" +
-                    "5. 结果在结果页展示，同时在通知中可查看",
+                    "5. 结果在结果页展示，同时在通知中可查看\n\n" +
+                    "⚠ 隐私提示：点悬浮按钮时，当前屏幕的协议文本（经脱敏）会发送至云端模型分析。" +
+                    "请勿在银行、支付等敏感页面使用。",
             style = MaterialTheme.typography.bodySmall
         )
     }

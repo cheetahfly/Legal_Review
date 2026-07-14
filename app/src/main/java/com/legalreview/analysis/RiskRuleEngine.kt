@@ -1,8 +1,11 @@
 package com.legalreview.analysis
 
+import kotlinx.serialization.Serializable
+
 /**
  * 风险条款类别。本地规则引擎与大模型输出共用同一套类别，便于合并结果。
  */
+@Serializable
 enum class RiskCategory(val label: String) {
     AUTO_RENEW("自动续费/连续扣款"),
     UNILATERAL_MODIFY("单方修改权"),
@@ -17,10 +20,11 @@ enum class RiskCategory(val label: String) {
     OTHER("其他风险")
 }
 
-enum class Severity(val label: String) {
-    HIGH("高"),
-    MEDIUM("中"),
-    LOW("低")
+@Serializable
+enum class Severity(val label: String, val rank: Int) {
+    HIGH("高", 3),
+    MEDIUM("中", 2),
+    LOW("低", 1)
 }
 
 /**
@@ -64,9 +68,10 @@ class RiskRuleEngine(
         val hits = mutableListOf<RiskHit>()
         for (rule in rules) {
             for (pattern in rule.patterns) {
-                val (regex, label) = compilePattern(pattern) ?: continue
+                val regex = compilePattern(pattern) ?: continue
                 regex.findAll(fullText).forEach { m ->
-                    hits.add(buildHit(rule, label, fullText, m.range.first, contextRadius))
+                    // 用实际命中文本 m.value，而非 pattern 字符串，避免把正则语法展示给用户
+                    hits.add(buildHit(rule, m.value, fullText, m.range.first, contextRadius))
                 }
             }
         }
@@ -80,17 +85,17 @@ class RiskRuleEngine(
      * - 其余纯字面量 → 用 Regex.escape 转义后按字面量匹配，忽略大小写。
      * 返回 (regex, 命中展示用 label)。
      */
-    private fun compilePattern(pattern: String): Pair<Regex, String>? {
+    private fun compilePattern(pattern: String): Regex? {
         return when {
             pattern.startsWith(REGEX_PREFIX) -> {
                 val expr = pattern.removePrefix(REGEX_PREFIX)
-                runCatching { Regex(expr) to expr }.getOrNull()
+                runCatching { Regex(expr) }.getOrNull()
             }
             containsRegexMeta(pattern) -> {
-                runCatching { Regex(pattern) to pattern }.getOrNull()
+                runCatching { Regex(pattern) }.getOrNull()
             }
             else -> {
-                runCatching { Regex(Regex.escape(pattern), RegexOption.IGNORE_CASE) to pattern }.getOrNull()
+                runCatching { Regex(Regex.escape(pattern), RegexOption.IGNORE_CASE) }.getOrNull()
             }
         }
     }
@@ -143,7 +148,7 @@ class RiskRuleEngine(
                 id = "unilateral_terminate_1",
                 category = RiskCategory.UNILATERAL_TERMINATE,
                 severity = Severity.MEDIUM,
-                patterns = listOf("有权随时终止", "单方终止", "无需承担任何责任.*终止", "随时中断"),
+                patterns = listOf("有权随时终止", "单方终止", "随时中断"),
                 explanation = "平台可单方随时终止服务，你的使用预期不受保障。"
             ),
             RiskRule(
@@ -171,21 +176,22 @@ class RiskRuleEngine(
                 id = "jurisdiction_1",
                 category = RiskCategory.JURISDICTION,
                 severity = Severity.MEDIUM,
-                patterns = listOf("regex:仲裁", "管辖法院.*所在地", "由.*法院管辖", "争议.*提交.*仲裁"),
+                patterns = listOf("regex:提交.*仲裁", "仲裁委员会", "管辖法院.*所在地", "由.*法院管辖"),
                 explanation = "争议解决方式/管辖地可能不利于你维权，提高诉讼成本。"
             ),
             RiskRule(
                 id = "irrevocable_auth_1",
                 category = RiskCategory.IRREVOCABLE_AUTH,
                 severity = Severity.HIGH,
-                patterns = listOf("不可撤销", "永久.*授权", "无偿.*使用.*永久"),
+                patterns = listOf("不可撤销", "无偿.*永久.*使用"),
                 explanation = "授予的授权不可撤销或永久有效，撤回困难。"
             ),
             RiskRule(
                 id = "high_penalty_1",
                 category = RiskCategory.HIGH_PENALTY,
                 severity = Severity.MEDIUM,
-                patterns = listOf("违约金.*\\d+%", "赔偿.*倍.*费用", "惩罚性赔偿"),
+                // M7: 要求违约金≥20%才命中，避免 1% 也报"过高"
+                patterns = listOf("违约金.*([2-9]\\d%|100%)", "赔偿.*\\d+倍", "惩罚性赔偿"),
                 explanation = "对你的违约责任设定较高违约金/赔偿，可能不对等。"
             ),
             RiskRule(

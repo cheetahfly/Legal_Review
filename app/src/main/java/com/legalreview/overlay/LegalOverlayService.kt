@@ -41,9 +41,14 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.legalreview.accessibility.LegalAccessibilityService
 import com.legalreview.analysis.AnalysisOrchestrator
 import com.legalreview.analysis.AnalysisResult
+import com.legalreview.analysis.AnalysisResultHolder
+import com.legalreview.analysis.FindingSource
+import com.legalreview.analysis.RiskCategory
 import com.legalreview.analysis.RiskFinding
+import com.legalreview.analysis.Severity
 import com.legalreview.data.SettingsRepository
 import com.legalreview.llm.LlmClientFactory
+import com.legalreview.llm.OpenAiCompatibleLlmClient
 import com.legalreview.ocr.OcrRecognizer
 import com.legalreview.ui.ResultActivity
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +56,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 前台服务，承载悬浮按钮 + MediaProjection 截图 + OCR + 分析调度。
@@ -67,6 +73,9 @@ class LegalOverlayService : Service() {
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var screenCaptureManager: ScreenCaptureManager? = null
     private val ocrRecognizer = OcrRecognizer()
+    // H5: 共享 OkHttpClient 与 SettingsRepository，避免每次分析新建（连接池/线程池泄漏）
+    private val sharedHttpClient by lazy { OpenAiCompatibleLlmClient.defaultHttpClient() }
+    private val settingsRepo by lazy { SettingsRepository(this) }
 
     private val layoutParams = WindowManager.LayoutParams().apply {
         type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -98,9 +107,16 @@ class LegalOverlayService : Service() {
         // 从 ProjectionAuthActivity 传入授权结果，初始化截图器。
         intent?.let {
             val resultCode = it.getIntExtra(ProjectionAuthActivity.EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
-            @Suppress("DEPRECATION")
-            val data: Intent? = it.getParcelableExtra(ProjectionAuthActivity.EXTRA_RESULT_DATA)
+            // L8: 用类型安全的新重载（Android 13+）
+            val data: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                it.getParcelableExtra(ProjectionAuthActivity.EXTRA_RESULT_DATA, Intent::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                it.getParcelableExtra(ProjectionAuthActivity.EXTRA_RESULT_DATA)
+            }
             if (resultCode == Activity.RESULT_OK && data != null) {
+                // H6: 重新授权前释放旧 MediaProjection，避免泄漏（Android 14+ 每 token 仅允许一个活跃投影）
+                screenCaptureManager?.stop()
                 screenCaptureManager = ScreenCaptureManager(this).also { mgr ->
                     mgr.start(resultCode, data)
                 }
@@ -145,7 +161,8 @@ class LegalOverlayService : Service() {
         view.postDelayed({
             Log.i(TAG, "Floating button clicked")
             coroutineScope.launch {
-                val result = runAnalysis()
+                // C1: 分析流水线（OCR 像素复制/规则扫描/无障碍节点遍历）移出主线程，避免 ANR
+                val result = withContext(Dispatchers.Default) { runAnalysis() }
                 view.visibility = View.VISIBLE
                 showResultNotification(result)
                 openResultScreen(result)
@@ -202,14 +219,12 @@ class LegalOverlayService : Service() {
         AnalysisResult(
             findings = listOf(
                 RiskFinding(
-                    category = "OTHER",
-                    categoryLabel = "提示",
-                    severity = "LOW",
-                    severityLabel = "低",
+                    category = RiskCategory.OTHER,
+                    severity = Severity.LOW,
                     excerpt = "",
                     explanation = message,
                     advice = "",
-                    source = "local"
+                    source = FindingSource.LOCAL
                 )
             ),
             rawTextLength = 0,
@@ -217,10 +232,10 @@ class LegalOverlayService : Service() {
         )
 
     private fun buildOrchestrator(): AnalysisOrchestrator {
-        val repo = SettingsRepository(this)
-        val config = repo.loadConfig()
+        val config = settingsRepo.loadConfig()
         val llmClient = if (config.apiKey.isNotBlank()) {
-            LlmClientFactory.create(config)
+            // H5: 复用共享 OkHttpClient
+            LlmClientFactory.create(config, sharedHttpClient)
         } else null
         return AnalysisOrchestrator(llmClient = llmClient)
     }
@@ -230,7 +245,7 @@ class LegalOverlayService : Service() {
         return buildString {
             append("发现 ${result.findings.size} 条需注意：\n\n")
             result.findings.take(5).forEachIndexed { i, f ->
-                append("${i + 1}. [${f.severityLabel}] ${f.categoryLabel}\n")
+                append("${i + 1}. [${f.severity.label}] ${f.category.label}\n")
                 if (f.explanation.isNotBlank()) append("   ${f.explanation}\n")
                 if (f.advice.isNotBlank()) append("   建议：${f.advice}\n")
                 append("\n")
@@ -255,11 +270,12 @@ class LegalOverlayService : Service() {
 
     /**
      * 通知点击的跳转：把结构化结果序列化后传给 ResultActivity 展示。
+     * H1: 同时写入进程内 holder，ResultActivity 优先从 holder 取，避免 Intent 超大崩溃。
      */
     private fun resultPendingIntent(result: AnalysisResult): PendingIntent {
-        val json = ResultSink.encode(result)
+        AnalysisResultHolder.put(result)
         val intent = Intent(this, ResultActivity::class.java).apply {
-            putExtra(ResultActivity.EXTRA_RESULT_JSON, json)
+            putExtra(ResultActivity.EXTRA_RESULT_JSON, ResultSink.encode(result))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return PendingIntent.getActivity(
@@ -270,11 +286,15 @@ class LegalOverlayService : Service() {
 
     /** 悬浮按钮分析完成后直接拉起结果页（沉浸式查看，不必等用户点通知）。 */
     private fun openResultScreen(result: AnalysisResult) {
+        AnalysisResultHolder.put(result)
         val intent = Intent(this, ResultActivity::class.java).apply {
             putExtra(ResultActivity.EXTRA_RESULT_JSON, ResultSink.encode(result))
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        startActivity(intent)
+        // H1: JSON 超 Binder ~1MB 上限时 startActivity 抛 TransactionTooLargeException，不能让服务崩
+        runCatching { startActivity(intent) }.onFailure {
+            Log.e(TAG, "打开结果页失败: ${it.message}")
+        }
     }
 
     private fun buildNotification(): Notification {

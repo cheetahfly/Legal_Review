@@ -32,11 +32,11 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true
+        buildConfig = false // L13: 无 BuildConfig 字段引用
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
+        kotlinCompilerExtensionVersion = libs.versions.composeCompiler.get()
     }
 
     compileOptions {
@@ -82,7 +82,6 @@ dependencies {
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.savedstate)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.appcompat)
 
     testImplementation(libs.junit)
     testImplementation(libs.okhttp.mockwebserver)

@@ -66,4 +66,34 @@ class RiskRuleEngineTest {
         val hits = engine.scan(text)
         assertTrue(hits.any { it.category == RiskCategory.IRREVOCABLE_AUTH })
     }
+
+    /** C2: OCR / 无障碍文本中跨行的关键词，归一化后仍应命中。
+     *  归一化（移除 \n）由 AnalysisOrchestrator 在做，这里测归一化后的效果。 */
+    @Test
+    fun `keyword hits across newlines after normalization`() {
+        val raw = "本公司不承担\n任何责任，且有权\n随时修改。"
+        val normalized = raw.replace("\n", "")
+        val hits = engine.scan(normalized)
+        assertTrue("换行归一化后 liability 规则应命中",
+            hits.any { it.category == RiskCategory.LIABILITY_LIMIT })
+        assertTrue("换行归一化后 unilateral_modify 字面量应命中",
+            hits.any { it.category == RiskCategory.UNILATERAL_MODIFY })
+    }
+
+    /** M7: 1% 违约金不宜报"过高"，≥20% 才报。 */
+    @Test
+    fun `low percentage does not trigger high penalty`() {
+        val text = "违约金按已支付费用的1%计算。"
+        val hits = engine.scan(text)
+        assertTrue("1% 不应命中 HIGH_PENALTY",
+            hits.none { it.category == RiskCategory.HIGH_PENALTY })
+    }
+
+    @Test
+    fun `high percentage still triggers high penalty`() {
+        val text = "违约金按已支付费用的30%计算。"
+        val hits = engine.scan(text)
+        assertTrue("30% 应命中 HIGH_PENALTY",
+            hits.any { it.category == RiskCategory.HIGH_PENALTY })
+    }
 }
