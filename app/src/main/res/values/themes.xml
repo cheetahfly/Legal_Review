@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主 Activity 用无 AppCompat 依赖的 Material 主题（ComponentActivity + Compose） -->
+    <style name="Theme.LegalReview" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- ProjectionAuthActivity 继承 AppCompatActivity，需 AppCompat 主题 -->
+    <style name="Theme.LegalReview.Auth" parent="Theme.AppCompat.Light.NoActionBar" />
+</resources>

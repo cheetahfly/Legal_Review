@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Legal_Review 真机测试指南</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card: #fff;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --warning: #ea580c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 20px;
+  }
+  .container { max-width: 820px; margin: 0 auto; }
+  h1 {
+    font-size: 1.8em;
+    margin: 0.8em 0 0.2em;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  h1 small {
+    font-size: 0.5em;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 0.95em;
+    margin-bottom: 2em;
+    border-left: 4px solid var(--accent);
+    padding-left: 16px;
+  }
+  h2 {
+    font-size: 1.3em;
+    margin: 1.6em 0 0.6em;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h2 .step-no {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px; height: 32px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.7em;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  h3 { font-size: 1.05em; margin: 1em 0 0.4em; }
+  p { margin: 0.6em 0; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin: 18px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card.tip { border-left: 4px solid var(--accent); background: #f0f7ff; }
+  .card.warn { border-left: 4px solid var(--warning); background: #fff7ed; }
+  .card.success { border-left: 4px solid var(--success); background: #f0fdf4; }
+
+  code {
+    font-family: "SF Mono", "Fira Code", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.88em;
+    background: #f1f5f9;
+    padding: 2px 7px;
+    border-radius: 4px;
+    word-break: break-all;
+  }
+  pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 14px 18px;
+    border-radius: 10px;
+    overflow-x: auto;
+    font-size: 0.88em;
+    line-height: 1.55;
+    margin: 10px 0;
+    tab-size: 2;
+  }
+  pre .cmt { color: #94a3b8; font-style: italic; }
+  pre .kw { color: #67e8f9; }
+  pre .str { color: #a5d6ff; }
+  pre .ok { color: #4ade80; }
+  pre .err { color: #f87171; }
+
+  .btn-copy {
+    float: right;
+    font-size: 0.78em;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--card);
+    margin-top: 4px;
+  }
+  .btn-copy:hover { background: var(--accent-light); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 0.93em;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  th { background: #f1f5f9; font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  .checklist-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+    align-items: flex-start;
+  }
+  .checklist-item::before {
+    content: "☐";
+    font-size: 1.2em;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--text-muted);
+  }
+
+  .toc { margin: 20px 0; }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+    display: block;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .toc a:hover { background: var(--accent-light); }
+  .toc .l2 { padding-left: 24px; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.78em;
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+  .badge.ok { background: #dcfce7; color: #166534; }
+  .badge.warn { background: #ffedd5; color: #9a3412; }
+
+  @media (max-width: 600px) {
+    body { padding: 12px; }
+    h1 { font-size: 1.4em; }
+    pre { font-size: 0.82em; padding: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📱 真机测试指南 <small>Legal_Review</small></h1>
+<div class="subtitle">从零开始在真实 Android 手机上测试本 App — 面向新手，每一步都告诉你点哪里。</div>
+
+<div class="card warn">
+  <strong>⏱ 所需时间：</strong>首次约 15-30 分钟（含开发者选项配置），后续约 5 分钟。<br>
+  <strong>📦 需要：</strong>一台 Android 手机 + USB 数据线（要能传数据）。
+</div>
+
+<div class="toc">
+  <strong>目录</strong>
+  <a href="#step0">0. 准备工作</a>
+  <a href="#step1" class="l2">手机端：开启开发者选项</a>
+  <a href="#step2" class="l2">电脑端：确认 adb 可用</a>
+  <a href="#step3">1. 连接手机</a>
+  <a href="#step4">2. 编译并安装 APK</a>
+  <a href="#step5">3. 启动 App</a>
+  <a href="#step5b">4. 跑自动化 instrumentation 测试</a>
+  <a href="#step6">5. 按手工清单走一遍</a>
+  <a href="#step7">6. 看日志（排查问题用）</a>
+  <a href="#trouble">7. 常见问题</a>
+  <a href="#summary">快速对照表</a>
+</div>
+
+<!-- ======================== 第 0 步 ======================== -->
+<h2 id="step0"><span class="step-no">0</span> 准备工作</h2>
+
+<h3 id="step1">📱 手机端：开启「开发者选项」和「USB 调试」</h3>
+<p>这是最关键的一步，每个手机差不多但菜单位置可能略有不同：</p>
+
+<div class="card">
+  <div class="checklist-item">打开手机 <strong>「设置」</strong> → <strong>「关于手机」</strong></div>
+  <div class="checklist-item">找到 <strong>「版本号」</strong>（有的叫「Build Number」），连续点击 <strong>7 次</strong></div>
+  <div class="checklist-item">底部会弹出提示「您已进入开发者模式」或类似文字</div>
+  <div class="checklist-item">返回设置首页，在搜索框搜 <strong>「开发者选项」</strong></div>
+  <div class="checklist-item">进入后打开 <strong>「USB 调试」</strong> 开关 ✅</div>
+</div>
+
+<div class="card tip">
+  <strong>💡 品牌差异：</strong><br>
+  <strong>小米/Redmi：</strong>还需要在开发者选项里打开 <strong>「USB 安装」</strong> 和 <strong>「USB 调试（安全设置）」</strong>。<br>
+  <strong>华为/荣耀：</strong>可能需要输一次锁屏密码来确认开启。<br>
+  <strong>三星：</strong>版本号在「关于手机」→「软件信息」里。<br>
+  <strong>OPPO/vivo：</strong>版本号通常在「关于手机」→「版本信息」里。
+</div>
+
+<h3 id="step2">💻 电脑端：确认 adb 命令可用</h3>
+<p>打开终端（Git Bash），跑：</p>
+<pre>export JAVA_HOME="C:/Users/user/.jdks/jdk-17/jdk-17.0.11+9"
+export PATH="$JAVA_HOME/bin:$PATH"
+export PATH="/f/Android/Sdk/platform-tools:$PATH"
+
+<span class="cmt"># 验证 adb 版本</span>
+adb --version</pre>
+<p>正常会显示版本号（如 <code>Android Debug Bridge version 1.0.41</code>）。如果报 <code>adb: command not found</code>，确认上面的路径对不对。</p>
+
+<div class="card tip">
+  <strong>💡 每次都要打 export？</strong> 是的，Git Bash 每次新开窗口都要设一次。<br>
+  <strong>一劳永逸的办法</strong>：把三行 export 加到 <code>~/.bashrc</code>：
+  <pre>
+echo 'export JAVA_HOME="C:/Users/user/.jdks/jdk-17/jdk-17.0.11+9"' >> ~/.bashrc
+echo 'export PATH="$JAVA_HOME/bin:\$PATH"' >> ~/.bashrc
+echo 'export PATH="/f/Android/Sdk/platform-tools:\$PATH"' >> ~/.bashrc</pre>
+</div>
+
+
+<!-- ======================== 第 1 步 ======================== -->
+<h2 id="step3"><span class="step-no">1</span> 连接手机</h2>
+
+<div class="card">
+  <div class="checklist-item">用 USB 数据线把手机插到电脑</div>
+  <div class="checklist-item">手机下拉通知栏 → 把「USB 用途」改成 <strong>「传输文件」</strong>（MTP），不是「仅充电」</div>
+  <div class="checklist-item">手机会弹框「允许 USB 调试吗？」，勾选「一律允许」，点确定</div>
+</div>
+
+<div class="card tip">
+  <strong>没弹框？</strong> 重新拔插 USB 线。还是没弹？去开发者选项里关掉再打开 USB 调试，再插线。
+</div>
+
+<p>然后跑验证命令：</p>
+<pre>adb devices -l</pre>
+
+<p>成功时的样子：</p>
+<pre>List of devices attached
+<span class="ok">XXXXXXXXXXXX    device product:xxx model:XXX_XX transport_id:X</span></pre>
+
+<p>失败时的样子：</p>
+<pre>List of devices attached
+<span class="err">（空 — 电脑完全没发现手机）</span></pre>
+<pre>List of devices attached
+XXXXXXXXXXXX    <span class="err">unauthorized</span>
+<span class="cmt">（手机连上了，但没确认授权）</span></pre>
+
+<div class="card warn">
+  <strong>常见坑：</strong>
+  <ul style="margin:8px 0 0 20px;">
+    <li><strong>换一根线！</strong>很多 USB 线只能充电，不能传数据。换手机原装线或标称「数据线」的。</li>
+    <li><strong>电脑 USB 口不行？</strong> 插机箱背面，别插机箱前面板。</li>
+    <li><strong>Windows 驱动没装？</strong> 连上后 Windows 应该自动装驱动，如果设备管理器有黄叹号，去手机官网下 USB 驱动手动装。</li>
+  </ul>
+</div>
+
+
+<!-- ======================== 第 2 步 ======================== -->
+<h2 id="step4"><span class="step-no">2</span> 编译并安装 APK</h2>
+
+<p>先切到项目目录，编译 debug APK：</p>
+<pre>cd F:/my_git/Legal_Review
+./gradlew :app:assembleDebug</pre>
+
+<p>然后装到手机上：</p>
+<pre><span class="cmt"># 首次安装</span>
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+<span class="cmt"># 如果已经装过，想完全重来（清数据）：</span>
+adb uninstall com.legalreview
+adb install app/build/outputs/apk/debug/app-debug.apk</pre>
+
+<p>安装成功会显示：</p>
+<pre><span class="ok">Performing Streamed Install
+Success</span></pre>
+
+
+<!-- ======================== 第 3 步 ======================== -->
+<h2 id="step5"><span class="step-no">3</span> 启动 App</h2>
+
+<pre>adb shell am start -n com.legalreview/.MainActivity</pre>
+
+<p>手机上应该弹出主界面，标题显示「协议把关」。如果没弹，看日志排查。</p>
+
+
+<!-- ======================== 第 4 步 ======================== -->
+<h2 id="step5b"><span class="step-no">4</span> 跑自动化 instrumentation 测试</h2>
+
+<div class="card tip">
+  <strong>这一步不是必须的</strong>，但能自动验证更多场景（设置加密、分析流水线在真机上的表现）。如果你时间充裕，跑一遍会多一层保障。
+</div>
+
+<pre><span class="cmt"># 确保手机还在线</span>
+adb devices -l
+
+<span class="cmt"># 跑所有 instrumentation 测试（3 个类、6 个用例）</span>
+./gradlew :app:connectedDebugAndroidTest
+
+<span class="cmt"># 看 HTML 报告</span>
+start app/build/reports/androidTests/connected/index.html</pre>
+
+<p>每个测试应该显示绿色 ✅。如果有红色的失败，截图给我。</p>
+
+
+<!-- ======================== 第 5 步 ======================== -->
+<h2 id="step6"><span class="step-no">5</span> 按手工清单走一遍</h2>
+
+<p>详细文档在 <code>docs/e2e-checklist.md</code>。下面是最快的验证路径：</p>
+
+<div class="card success">
+  <h3>⏱ 10 分钟快速路径（覆盖 80% 功能）</h3>
+  <div class="checklist-item">手机点 App 图标进入主界面 → 看到「协议把关」</div>
+  <div class="checklist-item">点 <strong>「去开启悬浮窗权限」</strong> → 跳转到系统设置 → 打开悬浮窗 → 返回 App</div>
+  <div class="checklist-item">下拉选择模型（保持 DeepSeek 即可）→ 填入 API Key → 点 <strong>「保存设置」</strong></div>
+  <div class="checklist-item">点 <strong>「授权并启动悬浮按钮」</strong> → 允许屏幕共享</div>
+  <div class="checklist-item">按 Home 键回到桌面 → 看到 <strong>悬浮按钮</strong></div>
+  <div class="checklist-item">打开浏览器 → 进去一个有协议条款的页面（比如搜"用户协议模板"）</div>
+  <div class="checklist-item">点悬浮按钮 → 等几秒 → 弹出风险条款结果</div>
+  <div class="checklist-item">验证结果包含至少 1 条风险项（比如「自动续费」）</div>
+</div>
+
+
+<!-- ======================== 第 6 步 ======================== -->
+<h2 id="step7"><span class="step-no">6</span> 看日志（排查问题用）</h2>
+
+<p>只显示我们 App 的输出，不刷系统垃圾：</p>
+<pre><span class="cmt"># 清空旧日志</span>
+adb logcat -c
+
+<span class="cmt"># 过滤只显示我们的 TAG</span>
+adb logcat LegalOverlayService:V ScreenCaptureManager:V OcrRecognizer:V \
+           AnalysisOrchestrator:V OpenAiCompatibleLlmClient:V \
+           SettingsRepository:V *:S</pre>
+
+<p>常见日志关键词：</p>
+<table>
+  <tr><th>TAG</th><th>看到什么表示正常</th></tr>
+  <tr><td>LegalOverlayService</td><td><code>onClick</code> → 截图流程开始</td></tr>
+  <tr><td>ScreenCaptureManager</td><td><code>MediaProjection started</code> → 截屏就绪</td></tr>
+  <tr><td>OcrRecognizer</td><td><code>recognize started</code> → 文本识别开始</td></tr>
+  <tr><td>AnalysisOrchestrator</td><td><code>local findings=N</code> → 本地规则命中 N 条</td></tr>
+  <tr><td>AnalysisOrchestrator</td><td><code>llm call took=Xms</code> → LLM 分析耗时</td></tr>
+  <tr><td>OpenAiCompatibleLlmClient</td><td><code>HTTP 401</code> → API Key 不对（但仍能出本地结果）</td></tr>
+</table>
+
+
+<!-- ======================== 第 7 步 ======================== -->
+<h2 id="trouble"><span class="step-no">7</span> 常见问题</h2>
+
+<table>
+  <tr><th style="width:40%">症状</th><th>怎么办</th></tr>
+  <tr>
+    <td><code>adb devices</code> 啥也没有</td>
+    <td>换 USB 线；改 USB 模式为「传输文件」；换电脑 USB 口</td>
+  </tr>
+  <tr>
+    <td><code>unauthorized</code></td>
+    <td>手机解锁，看有没有弹授权框</td>
+  </tr>
+  <tr>
+    <td>装不上 <code>INSTALL_FAILED_UPDATE_INCOMPATIBLE</code></td>
+    <td><code>adb uninstall com.legalreview</code> 再装</td>
+  </tr>
+  <tr>
+    <td>悬浮按钮没出现</td>
+    <td>去系统设置 → 应用 → 协议把关 → 显示悬浮窗，确认已开启</td>
+  </tr>
+  <tr>
+    <td>点悬浮按钮没反应</td>
+    <td><code>adb logcat LegalOverlayService:V *:S</code> 看日志</td>
+  </tr>
+  <tr>
+    <td>分析结果全是空的</td>
+    <td>检查 API Key 是否正确；看日志有没有 OCR 输出</td>
+  </tr>
+  <tr>
+    <td>打开 App 闪退</td>
+    <td><code>adb logcat *:E</code> 看崩溃堆栈，贴给我</td>
+  </tr>
+</table>
+
+
+<!-- ======================== 快速对照 ======================== -->
+<h2 id="summary">快速对照表</h2>
+
+<table>
+  <tr><th>你想做的</th><th>命令 / 操作</th></tr>
+  <tr><td>确认手机连上</td><td><code>adb devices -l</code></td></tr>
+  <tr><td>编译 APK</td><td><code>./gradlew :app:assembleDebug</code></td></tr>
+  <tr><td>安装 App</td><td><code>adb install -r app/build/outputs/apk/debug/app-debug.apk</code></td></tr>
+  <tr><td>卸载 App</td><td><code>adb uninstall com.legalreview</code></td></tr>
+  <tr><td>启动 App</td><td><code>adb shell am start -n com.legalreview/.MainActivity</code></td></tr>
+  <tr><td>清 App 数据</td><td><code>adb shell pm clear com.legalreview</code></td></tr>
+  <tr><td>跑自动化真机测试</td><td><code>./gradlew :app:connectedDebugAndroidTest</code></td></tr>
+  <tr><td>看自动化测试报告</td><td><code>start app/build/reports/androidTests/connected/index.html</code></td></tr>
+  <tr><td>看 App 日志</td><td><code>adb logcat -c && adb logcat LegalOverlayService:V *:S</code></td></tr>
+  <tr><td>抓崩溃日志</td><td><code>adb logcat *:E</code></td></tr>
+</table>
+
+<div class="card tip" style="margin-top:28px;">
+  <strong>📎 相关文件</strong><br>
+  <code>docs/e2e-checklist.md</code> — 完整手工测试场景（8 个分组，含回归策略）<br>
+  <code>docs/testing-cheatsheet.md</code> — 单元测试速查表<br>
+  <code>app/build/outputs/apk/debug/app-debug.apk</code> — 编译产物
+</div>
+
+</div>
+</body>
+</html>

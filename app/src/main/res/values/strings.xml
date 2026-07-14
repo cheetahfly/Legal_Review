@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">协议把关</string>
+    <string name="accessibility_service_desc">读取当前屏幕文本，用于协议风险审查（免截图/OCR 的快捷路径，可选开启）。</string>
+</resources>
